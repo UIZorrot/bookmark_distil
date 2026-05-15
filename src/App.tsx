@@ -13,6 +13,7 @@ import {
   type MemberProfile,
   type SyncPayload,
 } from './backendApi';
+import { resolveLlmModeView, type LlmMode } from './llmMode';
 
 interface BookmarkItem {
   title: string;
@@ -667,11 +668,12 @@ export default function App() {
     apiKey: string;
     endpoint: string;
     model: string;
+    aiMode: LlmMode;
     accessPassword: string;
     language: LanguagePreference;
     memberToken: string;
     memberEmail: string;
-  }>({ apiKey: '', endpoint: '', model: '', accessPassword: '', language: 'auto', memberToken: '', memberEmail: '' });
+  }>({ apiKey: '', endpoint: '', model: '', aiMode: 'byok', accessPassword: '', language: 'auto', memberToken: '', memberEmail: '' });
   const [isTestingLlm, setIsTestingLlm] = useState(false);
   const [readHistory, setReadHistory] = useState<string[]>([]);
   const [trashIndex, setTrashIndex] = useState<Record<string, TrashRecord>>({});
@@ -731,6 +733,14 @@ export default function App() {
     const s = memberProfile?.stripe_subscription_status?.trim().toLowerCase() || '';
     return s === 'active' || s === 'trialing';
   }, [memberProfile]);
+  const llmModeView = useMemo(
+    () =>
+      resolveLlmModeView({
+        memberActive: memberProSubscriptionActive,
+        currentMode: settings.aiMode,
+      }),
+    [memberProSubscriptionActive, settings.aiMode],
+  );
   const currentSyncPayload = useMemo(
     () => ({ collections, readHistory, trashIndex } as SyncPayload),
     [collections, readHistory, trashIndex],
@@ -760,6 +770,7 @@ export default function App() {
           apiKey?: string;
           endpoint?: string;
           model?: string;
+          aiMode?: LlmMode;
           accessPassword?: string;
           language?: LanguagePreference;
           memberToken?: string;
@@ -771,6 +782,7 @@ export default function App() {
           apiKey: loadedSettings.apiKey || '',
           endpoint: loadedSettings.endpoint || '',
           model: loadedSettings.model || '',
+          aiMode: loadedSettings.aiMode === 'hosted' ? 'hosted' : 'byok',
           accessPassword: loadedSettings.accessPassword || '',
           language: loadedLanguage,
           memberToken: loadedSettings.memberToken || '',
@@ -870,7 +882,7 @@ export default function App() {
   };
 
   const handleTestLlmSettings = () => {
-    if (!settings.apiKey.trim()) {
+    if (llmModeView.effectiveMode === 'byok' && !settings.apiKey.trim()) {
       alert(tr('请先填写 API Key。', 'Please enter an API Key first.'));
       return;
     }
@@ -884,6 +896,8 @@ export default function App() {
           apiKey: settings.apiKey,
           endpoint: settings.endpoint,
           model: settings.model,
+          aiMode: llmModeView.effectiveMode,
+          memberToken: settings.memberToken,
         },
       },
       (res) => {
@@ -903,6 +917,11 @@ export default function App() {
       }
     );
   };
+
+  useEffect(() => {
+    if (settings.aiMode === llmModeView.effectiveMode) return;
+    setSettings((prev) => ({ ...prev, aiMode: llmModeView.effectiveMode }));
+  }, [settings.aiMode, llmModeView.effectiveMode]);
 
   const handleUnlock = () => {
     if (!settings.accessPassword) {
@@ -2767,42 +2786,82 @@ export default function App() {
                   <div className="space-y-4 rounded-2xl border border-zinc-200/60 bg-transparent p-5">
                     <div>
                       <h4 className="text-sm font-medium text-zinc-900">{tr('LLM 配置', 'LLM Settings')}</h4>
-                      <p className="mt-1 text-sm text-zinc-400">{tr('配置兼容 OpenAI 的接口，用于总结、分类、打标签和评分。', 'Configure an OpenAI-compatible API for summarizing, categorizing, tagging, and scoring.')}</p>
+                      <p className="mt-1 text-sm text-zinc-400">
+                        {tr(
+                          '可选择自备 API（BYOK）或会员模型；会员模型开通后无需填写 API Key。',
+                          'Choose BYOK API or member-hosted model. Hosted model does not require API key.',
+                        )}
+                      </p>
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-zinc-600">API Key</label>
-                      <input
-                        type="password"
-                        value={settings.apiKey || ''}
-                        onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
+                      <label className="mb-1 block text-sm font-medium text-zinc-600">{tr('模型来源', 'Model source')}</label>
+                      <select
+                        value={llmModeView.effectiveMode}
+                        onChange={(e) => {
+                          const selected = e.target.value === 'hosted' ? 'hosted' : 'byok';
+                          setSettings({ ...settings, aiMode: selected });
+                        }}
                         className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-emerald-400"
-                        placeholder="sk-..."
-                      />
+                      >
+                        <option value="byok">{tr('自备 API（BYOK）', 'Bring your own API (BYOK)')}</option>
+                        <option value="hosted" disabled={!llmModeView.hostedAvailable}>
+                          {llmModeView.hostedAvailable ? tr('会员模型（推荐）', 'Member hosted model (recommended)') : tr('会员模型（开通会员后可用）', 'Member hosted model (requires membership)')}
+                        </option>
+                      </select>
+                      {llmModeView.upgradeHint && (
+                        <p className="mt-2 text-xs text-amber-700">
+                          {tr('开通会员后可直接使用会员模型，无需自备 API Key。', 'Membership unlocks hosted model access without your own API key.')}
+                        </p>
+                      )}
+                      {!llmModeView.upgradeHint && llmModeView.effectiveMode === 'hosted' && (
+                        <p className="mt-2 text-xs text-emerald-700">
+                          {tr('当前使用会员模型。需要时可切回 BYOK。', 'You are using the member hosted model. You can switch back to BYOK anytime.')}
+                        </p>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-zinc-600">API Endpoint</label>
-                      <input
-                        type="text"
-                        value={settings.endpoint || ''}
-                        onChange={(e) => setSettings({ ...settings, endpoint: e.target.value })}
-                        className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-emerald-400"
-                        placeholder="https://openrouter.ai/api/v1/chat/completions"
-                      />
-                      <p className="mt-2 text-xs text-zinc-400">{tr('OpenRouter 请填写 `https://openrouter.ai/api/v1/chat/completions`。', 'For OpenRouter, use `https://openrouter.ai/api/v1/chat/completions`.')}</p>
-                    </div>
+                    {llmModeView.effectiveMode === 'byok' ? (
+                      <>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-zinc-600">API Key</label>
+                          <input
+                            type="password"
+                            value={settings.apiKey || ''}
+                            onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
+                            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-emerald-400"
+                            placeholder="sk-..."
+                          />
+                        </div>
 
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-zinc-600">Model</label>
-                      <input
-                        type="text"
-                        value={settings.model || ''}
-                        onChange={(e) => setSettings({ ...settings, model: e.target.value })}
-                        className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-emerald-400"
-                        placeholder="openai/gpt-5.2"
-                      />
-                    </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-zinc-600">API Endpoint</label>
+                          <input
+                            type="text"
+                            value={settings.endpoint || ''}
+                            onChange={(e) => setSettings({ ...settings, endpoint: e.target.value })}
+                            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-emerald-400"
+                            placeholder="https://openrouter.ai/api/v1/chat/completions"
+                          />
+                          <p className="mt-2 text-xs text-zinc-400">{tr('OpenRouter 请填写 `https://openrouter.ai/api/v1/chat/completions`。', 'For OpenRouter, use `https://openrouter.ai/api/v1/chat/completions`.')}</p>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-zinc-600">Model</label>
+                          <input
+                            type="text"
+                            value={settings.model || ''}
+                            onChange={(e) => setSettings({ ...settings, model: e.target.value })}
+                            className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-emerald-400"
+                            placeholder="openai/gpt-5.2"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                        {tr('会员模型已启用，后台将自动使用会员账号的托管模型。', 'Member hosted model is enabled. The extension will use your hosted model automatically.')}
+                      </div>
+                    )}
 
                     <button
                       onClick={handleTestLlmSettings}
