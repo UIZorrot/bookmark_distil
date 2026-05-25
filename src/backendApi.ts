@@ -65,7 +65,7 @@ function networkError() {
   };
 }
 
-function extractTextContent(value: unknown): string | null {
+export function extractTextContent(value: unknown): string | null {
   if (typeof value === 'string') {
     return value.trim() ? value : null;
   }

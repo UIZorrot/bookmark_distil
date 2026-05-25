@@ -1,11 +1,13 @@
 ﻿import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Activity, ArrowLeft, ArrowUpRight, ChevronLeft, ChevronRight, Cloud, CreditCard, Eye, Link2, LogOut, MessageSquare, Plus, RefreshCw, Search, Send, Settings, Sparkles, Star, Trash2, UserCircle, X } from 'lucide-react';
+import { useEffectEvent } from 'react';
 import { resolveLanguage, tr as trRaw, type LanguagePreference } from './i18n';
 import {
   DEFAULT_MEMBER_API_BASE,
   createCheckoutSession,
   downloadSyncState,
   getMemberProfile,
+  isBadMemberTokenError,
   redeemInviteCode,
   requestEmailVerificationCode,
   uploadSyncState,
@@ -748,6 +750,11 @@ export default function App() {
   );
   const currentSyncFingerprint = useMemo(() => syncFingerprint(currentSyncPayload), [currentSyncPayload]);
   const cloudSyncEnabled = Boolean(memberProfile?.hosted_ai_enabled);
+  const handleMemberAuthFailure = useEffectEvent(async (result: { status?: string; message?: string; statusCode?: number }) => {
+    if (!isBadMemberTokenError(result)) return false;
+    await logoutMember(tr('登录状态已失效，请重新登录。', 'Your session expired. Please sign in again.'));
+    return true;
+  });
 
   const getSearchReasonLabel = (reason: SearchReason) => {
     if (reason === 'phrase') return tr('精确短语', 'Exact phrase');
@@ -857,7 +864,11 @@ export default function App() {
       setIsMemberBusy(true);
       const res = await getMemberProfile({ apiBase: MEMBER_API_BASE, token });
       setIsMemberBusy(false);
-      if (res.status === 'ok') setMemberProfile(res.data);
+      if (res.status === 'ok') {
+        setMemberProfile(res.data);
+        return;
+      }
+      await handleMemberAuthFailure(res);
     })();
   }, [settings.memberToken, MEMBER_API_BASE]);
 
@@ -869,7 +880,11 @@ export default function App() {
       setIsMemberBusy(true);
       const res = await getMemberProfile({ apiBase: MEMBER_API_BASE, token });
       setIsMemberBusy(false);
-      if (res.status === 'ok') setMemberProfile(res.data);
+      if (res.status === 'ok') {
+        setMemberProfile(res.data);
+        return;
+      }
+      await handleMemberAuthFailure(res);
     })();
   }, [activeTab, settings.memberToken, MEMBER_API_BASE]);
 
@@ -954,6 +969,7 @@ export default function App() {
       setMemberMessage('');
       return;
     }
+    if (await handleMemberAuthFailure(res)) return;
     setMemberMessage(tr(`无法刷新账号信息：${res.message}`, `Could not refresh account status: ${res.message}`));
   };
 
@@ -999,7 +1015,7 @@ export default function App() {
     setMemberMessage(tr(`登录失败：${res.message}`, `Sign-in failed: ${res.message}`));
   };
 
-  const logoutMember = async () => {
+  const logoutMember = async (message?: string) => {
     const next = { ...settings, memberToken: '', memberEmail: '' };
     setSettings(next);
     setMemberProfile(null);
@@ -1009,7 +1025,7 @@ export default function App() {
     setSyncConflict(null);
     setShowSyncConflictActions(false);
     await chrome.storage.local.set({ settings: next });
-    setMemberMessage(tr('已退出登录。', 'Signed out.'));
+    setMemberMessage(message || tr('已退出登录。', 'Signed out.'));
   };
 
   const openMemberCheckout = async () => {
@@ -1025,6 +1041,7 @@ export default function App() {
       setMemberMessage(tr('已打开结算页面。支付完成后请刷新订阅状态。', 'Checkout opened. Refresh subscription status after payment.'));
       return;
     }
+    if (await handleMemberAuthFailure(res)) return;
     setMemberMessage(tr(`创建支付链接失败：${res.message}`, `Could not create checkout link: ${res.message}`));
   };
 
@@ -1047,6 +1064,7 @@ export default function App() {
       setMemberMessage(tr('邀请码已兑换，会员状态已更新。', 'Invite code redeemed. Membership status updated.'));
       return;
     }
+    if (await handleMemberAuthFailure(res)) return;
     setMemberMessage(tr(`邀请码兑换失败：${res.message}`, `Invite code redemption failed: ${res.message}`));
   };
 
@@ -1068,6 +1086,7 @@ export default function App() {
       setIsMemberBusy(false);
       if (cancelled) return;
       if (res.status !== 'ok') {
+        if (await handleMemberAuthFailure(res)) return;
         setMemberMessage(tr(`云同步初始化失败：${res.message}`, `Cloud sync initialization failed: ${res.message}`));
         return;
       }
@@ -1082,6 +1101,7 @@ export default function App() {
           setShowSyncConflictActions(false);
           return;
         }
+        if (await handleMemberAuthFailure(uploadRes)) return;
         setMemberMessage(tr(`首次上传云同步失败：${uploadRes.message}`, `Initial cloud upload failed: ${uploadRes.message}`));
         return;
       }
@@ -1116,7 +1136,9 @@ export default function App() {
       if (cancelled) return;
       if (res.status === 'ok') {
         lastSyncedSnapshotRef.current = currentSyncFingerprint;
+        return;
       }
+      await handleMemberAuthFailure(res);
     })();
     return () => {
       cancelled = true;
@@ -1138,6 +1160,7 @@ export default function App() {
     const res = await uploadSyncState({ apiBase: MEMBER_API_BASE, token }, syncConflict.local);
     setIsMemberBusy(false);
     if (res.status !== 'ok') {
+      if (await handleMemberAuthFailure(res)) return;
       setMemberMessage(tr(`保留本地版本失败：${res.message}`, `Keep local version failed: ${res.message}`));
       return;
     }

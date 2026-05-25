@@ -1,4 +1,4 @@
-import { callHostedChatCompletion, testHostedAiConnection } from '../backendApi';
+import { callHostedChatCompletion, extractTextContent, testHostedAiConnection } from '../backendApi';
 
 export { };
 
@@ -225,6 +225,10 @@ async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = 20
   }
 }
 
+function hasCompatibleChatChoice(data: unknown) {
+  return Boolean((data as { choices?: unknown[] })?.choices?.length);
+}
+
 async function testLLMConnection(settings: Settings) {
   if (settings.aiMode === 'hosted') {
     if (!settings.memberToken?.trim()) {
@@ -298,8 +302,10 @@ async function testLLMConnection(settings: Settings) {
       };
     }
 
-    const content = (data as { choices?: Array<{ message?: { content?: string } }> })?.choices?.[0]?.message?.content;
-    if (content) {
+    const firstMessage = (data as { choices?: Array<{ message?: { content?: unknown; reasoning_content?: unknown } }> })?.choices?.[0]?.message;
+    const content = extractTextContent(firstMessage?.content);
+    const reasoning = extractTextContent(firstMessage?.reasoning_content);
+    if (content || reasoning || hasCompatibleChatChoice(data)) {
       return {
         status: 'ok' as const,
         message: `测试成功：已收到模型响应（${model}）。`,
@@ -399,7 +405,8 @@ Output ONLY valid JSON.
 
     const data = await response.json();
     if (data.choices && data.choices.length > 0) {
-      const content = data.choices[0].message.content;
+      const content = extractTextContent(data.choices[0].message.content);
+      if (!content) return null;
       const jsonStr = content.replace(/```json/g, '').replace(/```/g, '').trim();
       const result = JSON.parse(jsonStr);
       return result;
@@ -521,7 +528,7 @@ ${contextBlock || '无'}
     }
 
     const data = await response.json();
-    const content = (data as { choices?: Array<{ message?: { content?: string } }> })?.choices?.[0]?.message?.content;
+    const content = extractTextContent((data as { choices?: Array<{ message?: { content?: unknown } }> })?.choices?.[0]?.message?.content);
 
     if (!content) {
       return { status: 'error' as const, message: '模型已响应，但没有返回可用内容。' };
