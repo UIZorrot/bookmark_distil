@@ -1,0 +1,111 @@
+Valued Intellectual Benefit & Equity License (V.I.B.E)
+
+Copyright (c) 2026
+
+
+1. Definitions
+
+"Work" means any software, prompt, documentation, or other material made available under this License.
+
+"Derivative Work" means any work that is based on, derived from, or substantially similar to the Work, including (but not limited to) modifications, adaptations, manual rewrites, AI-assisted refactors, translations, or any other form of derivation.
+
+"Prompt" means any prompt, prompt history, or input sequence included in the Work. Prompts are an integral part of the Work.
+
+"Commercial Use" means any use that directly or indirectly generates revenue or is intended for commercial advantage, including SaaS, API services, or any network-based distribution.
+
+"Gross Revenue" means all revenue derived from a product or service (or product/service line) that incorporates or depends on the Work, before deduction of expenses.
+
+"Distribution" includes traditional distribution as well as providing access via a network (SaaS, API, cloud service, etc.).
+
+
+
+2. Grant of Rights
+
+Subject to the terms and conditions of this License:
+
+(a) You may use, copy, modify, and distribute the Work for non-commercial purposes without additional permission.
+
+(b) Commercial Use and any AI Usage (including training, fine-tuning, or improving any machine learning or artificial intelligence model) are permitted only in compliance with Section 3.
+
+
+
+3. Conditions
+
+3.1 Enhanced Attribution
+You must provide prominent and clear attribution in all distributions and Derivative Works. The attribution must:
+
+- State exactly: “Core logic / Prompts powered by [Licensor Name]’s V.I.B.E. licensed Work [Link to original Work]”  
+- Appear in: (i) the primary README or documentation, (ii) App Store / Marketplace descriptions, and (iii) the primary User Interface (e.g., splash screen, footer, or about page).  
+
+The attribution must be clearly visible and not less prominent than the primary branding of your Derivative Work. Failure to comply constitutes a material breach of this License.
+
+3.2 Substantial Similarity & Anti-Evasion
+A work shall be deemed a Derivative Work if it is substantially similar in structure, logic, expression, architecture, core algorithms, data models, interfaces, system behavior, prompt patterns, or input-output sequences, regardless of the programming language, framework, or implementation method used.
+
+Minor or superficial modifications (including renaming, formatting, reorganization, modularization, or reimplementation of substantially similar functionality) do not exclude a work from this definition. Attempts to avoid the application of this License through such means shall not prevent its application.
+
+3.3 Commercial Use & Revenue Model
+Safe Harbor: If your annual Gross Revenue from the product or service is less than $1,000 USD, no fee is required, provided you fully comply with the attribution requirements in Section 3.1.
+
+Default Royalty: Upon exceeding the Safe Harbor threshold, a default royalty of 1% of Gross Revenue attributable to the Work applies.  
+
+Revenue is considered attributable where the Work constitutes a core functional component, a significant technical element, or a material contributor to user-facing value. Where the contribution is not self-evident, a reasonable allocation shall be determined in good faith.
+
+Use of the Work in a commercial context without a separately negotiated agreement constitutes acceptance of these default terms. You must maintain accurate records sufficient to demonstrate compliance and provide a summary or signed declaration upon reasonable written request from the Licensor.
+
+3.4 AI Usage & Prompt Protection
+You may not use the Work (or any part of it) to train, fine-tune, or improve any machine learning or artificial intelligence model without obtaining a separate commercial license from the Licensor.  
+
+Prompts may not be separately commercialized or distributed except in full compliance with this License.
+
+3.5 License Propagation
+You may distribute Derivative Works only under this same V.I.B.E. License. All obligations under this License apply to any recipient. The Licensor’s rights shall not be reduced or eliminated by any subsequent distribution.
+
+3.6 Patent Non-Aggression
+If you initiate patent litigation against the Licensor (or any of their affiliates) asserting that the Work infringes your patents, your rights under this License terminate automatically.
+
+3.7 Alternative Licensing
+The Licensor may offer separate license terms that supersede some or all conditions of this License at any time.
+
+
+
+4. Termination
+
+Your rights under this License terminate automatically upon any breach. If the violation is capable of being cured (for example, missing or incomplete attribution), the Licensor may allow a 30-day grace period to restore compliance. Failure to cure within this period results in permanent termination of all rights.  
+
+Upon termination, you must immediately cease all use, distribution, and commercialization of the Work and all Derivative Works.
+
+
+
+5. Disclaimer of Warranty
+
+THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+
+
+6. Limitation of Liability
+
+IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE WORK OR THE USE OR INABILITY TO USE THE WORK.
+
+
+
+7. Severability & No Waiver
+
+If any provision of this License is held invalid or unenforceable, the remaining provisions shall remain in full force and effect. Failure by the Licensor to enforce any provision shall not constitute a waiver of that provision.
+
+
+
+8. Governing Law & Jurisdiction
+
+This License shall be governed by the laws of Singapore. Any disputes arising out of or in connection with this License shall be subject to the exclusive jurisdiction of the courts of Singapore.
+
+
+
+9. Versioning
+
+The Licensor may publish updated versions of this License. Unless explicitly stated otherwise, the updated version applies only to new distributions or uses occurring after its release.
+
+
+
+End of License
+
