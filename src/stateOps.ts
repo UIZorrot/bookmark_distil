@@ -49,6 +49,17 @@ export function getBookmarkKey(url: string) {
   return normalizeBookmarkUrl(url);
 }
 
+function getQualityTier(
+  score?: number,
+  tier?: 'high' | 'medium' | 'low' | 'unclassified'
+) {
+  if (tier) return tier;
+  if (typeof score !== 'number') return undefined;
+  if (score >= 8) return 'high';
+  if (score >= 5) return 'medium';
+  return 'low';
+}
+
 export function moveItemToTrashState<TItem extends TrashStateBookmark>(
   collections: Record<string, TrashStateCollection<TItem>>,
   trashIndex: Record<string, TrashStateRecord<TItem>>,
@@ -129,4 +140,37 @@ export function restoreTrashItemState<TItem extends TrashStateBookmark>(
   };
 
   return { collections: nextCollections, trashIndex: nextTrashIndex };
+}
+
+export function clearStoredTrashState<TItem extends TrashStateBookmark>(
+  collections: Record<string, TrashStateCollection<TItem>>,
+  _trashIndex: Record<string, TrashStateRecord<TItem>>,
+) {
+  return {
+    collections,
+    trashIndex: {} as Record<string, TrashStateRecord<TItem>>,
+  };
+}
+
+export function deleteAllLowQualityState<TItem extends TrashStateBookmark>(
+  collections: Record<string, TrashStateCollection<TItem>>,
+  trashIndex: Record<string, TrashStateRecord<TItem>>,
+) {
+  const nextCollections: Record<string, TrashStateCollection<TItem>> = Object.fromEntries(
+    Object.entries(collections).map(([collectionId, collection]) => [
+      collectionId,
+      {
+        ...collection,
+        items: collection.items.filter(
+          (entry) => getQualityTier(entry.qualityScore, entry.qualityTier) !== 'low'
+        ),
+        lastUpdated: Date.now(),
+      },
+    ])
+  );
+
+  return {
+    collections: nextCollections,
+    trashIndex,
+  };
 }

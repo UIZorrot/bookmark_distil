@@ -1,6 +1,6 @@
 # Bookmark Distil
 
-Chrome extension that pulls your **Zhihu collections** or **X (Twitter) bookmarks** into one workspace: deduplicated entries, summaries, tagging, trash for low-confidence items, Markdown archives on demand, and a **bring-your-own-key (BYOK)** chat over your indexed bookmarks.
+Chrome extension that pulls your **Zhihu/X/xiaohongshu bookmarks** into one workspace: deduplicated entries, summaries, tagging, trash for low-confidence items, Markdown archives on demand, and a **bring-your-own-key (BYOK)** chat over your indexed bookmarks.
 
 ---
 

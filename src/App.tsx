@@ -14,6 +14,7 @@ import {
   type SyncPayload,
 } from './backendApi';
 import { resolveLlmModeView, type LlmMode } from './llmMode';
+import { clearStoredTrashState, deleteAllLowQualityState } from './stateOps';
 
 interface BookmarkItem {
   title: string;
@@ -1313,6 +1314,26 @@ export default function App() {
     await chrome.storage.local.set({ trashIndex: nextTrashIndex });
   };
 
+  const clearStoredTrash = async () => {
+    if (storedTrashCount === 0) return;
+    const nextState = clearStoredTrashState(collections, trashIndex);
+    setTrashIndex(nextState.trashIndex);
+    if (selectedTrashItem?.stored && selectedTrashItem.reason !== 'low_value') {
+      setSelectedItemKey(null);
+    }
+    await chrome.storage.local.set({ trashIndex: nextState.trashIndex });
+  };
+
+  const deleteAllLowQuality = async () => {
+    if (lowQualityTrashCount === 0) return;
+    const nextState = deleteAllLowQualityState(collections, trashIndex);
+    setCollections(nextState.collections);
+    if (selectedTrashItem?.reason === 'low_value') {
+      setSelectedItemKey(null);
+    }
+    await chrome.storage.local.set({ collections: nextState.collections });
+  };
+
   const promoteLowQualityItem = async (key: string, targetTier: 'medium' | 'high') => {
     const nextCollections: Record<string, Collection> = Object.fromEntries(
       Object.entries(collections).map(([collectionId, collection]) => [
@@ -1535,6 +1556,8 @@ export default function App() {
   const pagedTrashItems = trashItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const selectedTrashItem = trashItems.find((item) => item.key === selectedItemKey) || null;
+  const storedTrashCount = trashItems.filter((item) => item.stored && item.reason !== 'low_value').length;
+  const lowQualityTrashCount = trashItems.filter((item) => item.reason === 'low_value').length;
   const readingItem = activeItems.find((item) => item.key === readingItemKey) || null;
 
   const allItems = indexedItems;
@@ -2482,9 +2505,29 @@ export default function App() {
 
               <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm">
                 <div className="border-b border-zinc-200/60 p-5">
-                  <div>
-                    <h3 className="text-lg font-semibold text-zinc-900">{tr('垃圾箱列表', 'Trash')}</h3>
-                    <p className="mt-1 text-sm text-zinc-400">{tr('这里会展示低质量内容，以及你手动删除或校验失效的条目。', 'Low-quality items and manually deleted or invalid entries appear here.')}</p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-zinc-900">{tr('垃圾箱列表', 'Trash')}</h3>
+                      <p className="mt-1 text-sm text-zinc-400">{tr('这里会展示低质量内容，以及你手动删除或校验失效的条目。', 'Low-quality items and manually deleted or invalid entries appear here.')}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void clearStoredTrash()}
+                        disabled={storedTrashCount === 0}
+                        className="rounded-xl border border-zinc-200 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {tr('清空垃圾箱', 'Empty trash')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteAllLowQuality()}
+                        disabled={lowQualityTrashCount === 0}
+                        className="rounded-xl border border-red-500/30 px-3 py-2 text-sm text-red-600 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {tr('删除全部低质量', 'Delete all low-quality')}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
