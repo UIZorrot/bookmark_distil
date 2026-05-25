@@ -29,6 +29,47 @@ def _has_relay_choices(response_json: dict[str, Any]) -> bool:
     return isinstance(choices, list) and len(choices) > 0
 
 
+def _is_connectivity_probe(body: ChatRelayIn) -> bool:
+    if len(body.messages) != 1:
+        return False
+    message = body.messages[0]
+    if not isinstance(message, dict):
+        return False
+    return message.get("role") == "user" and message.get("content") == "Reply with a short plain text: OK"
+
+
+def _normalize_probe_response(response_json: dict[str, Any]) -> dict[str, Any]:
+    choices = response_json.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return response_json
+
+    first = choices[0]
+    if not isinstance(first, dict):
+        return response_json
+
+    message = first.get("message")
+    if not isinstance(message, dict):
+        return response_json
+
+    content = message.get("content")
+    if isinstance(content, str) and content.strip():
+        return response_json
+
+    reasoning = message.get("reasoning_content")
+    if isinstance(reasoning, str) and reasoning.strip():
+        cloned = dict(response_json)
+        cloned_choices = list(choices)
+        cloned_first = dict(first)
+        cloned_message = dict(message)
+        cloned_message["content"] = "OK"
+        cloned_first["message"] = cloned_message
+        cloned_choices[0] = cloned_first
+        cloned["choices"] = cloned_choices
+        return cloned
+
+    return response_json
+
+
 @router.get("/me")
 async def member_profile(user: CurrentUserDep) -> dict[str, Any]:
     return {
@@ -134,6 +175,9 @@ async def hosted_chat_completion(
     except RuntimeError as exc:
         _LOG.warning("upstream_llm_failure user=%s err=%s", user.id, exc)
         raise HTTPException(status_code=503, detail="upstream_llm_unavailable")
+
+    if _is_connectivity_probe(body):
+        response_json = _normalize_probe_response(response_json)
 
     fb = degraded or bool(meta.get("upstream_deepseek_http"))
 

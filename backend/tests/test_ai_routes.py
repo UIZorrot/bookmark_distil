@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi import HTTPException
 
-from app.routes_ai import _has_relay_choices, hosted_ai_test
+from app.routes_ai import _has_relay_choices, _is_connectivity_probe, _normalize_probe_response, hosted_ai_test
 
 
 class HostedAiRouteTests(unittest.IsolatedAsyncioTestCase):
@@ -48,6 +48,30 @@ class HostedAiRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(_has_relay_choices({"choices": []}))
         self.assertFalse(_has_relay_choices({"choices": None}))
         self.assertFalse(_has_relay_choices({"error": {"message": "bad gateway"}}))
+
+    def test_detects_connectivity_probe_payload(self):
+        probe = SimpleNamespace(messages=[{"role": "user", "content": "Reply with a short plain text: OK"}])
+        normal = SimpleNamespace(messages=[{"role": "user", "content": "Summarize this page"}])
+
+        self.assertTrue(_is_connectivity_probe(probe))
+        self.assertFalse(_is_connectivity_probe(normal))
+
+    def test_normalize_probe_response_fills_empty_content_with_ok(self):
+        payload = {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "",
+                        "reasoning_content": "We should answer OK",
+                    }
+                }
+            ]
+        }
+
+        normalized = _normalize_probe_response(payload)
+
+        self.assertEqual(normalized["choices"][0]["message"]["content"], "OK")
 
 
 if __name__ == "__main__":

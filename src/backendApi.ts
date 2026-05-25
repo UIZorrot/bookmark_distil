@@ -1,4 +1,5 @@
 export const DEFAULT_MEMBER_API_BASE = import.meta.env.VITE_MEMBER_API_BASE || 'http://127.0.0.1:8789/api/v1';
+export const CLIENT_RUNTIME_MARKER = 'client-20260525-1245';
 
 export type Fetcher = typeof fetch;
 

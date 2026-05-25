@@ -16,6 +16,7 @@ import {
   type SyncPayload,
 } from './backendApi';
 import { resolveLlmModeView, type LlmMode } from './llmMode';
+import { createAppNotification, type AppNotification } from './notification';
 import { clearStoredTrashState, deleteAllLowQualityState } from './stateOps';
 
 interface BookmarkItem {
@@ -719,11 +720,13 @@ export default function App() {
   const [isMemberBusy, setIsMemberBusy] = useState(false);
   const [syncConflict, setSyncConflict] = useState<SyncConflict | null>(null);
   const [showSyncConflictActions, setShowSyncConflictActions] = useState(false);
+  const [notification, setNotification] = useState<AppNotification | null>(null);
   const chatThreadsLoadedRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const syncInitializedRef = useRef(false);
   const lastSyncedSnapshotRef = useRef('');
   const applyingCloudSyncRef = useRef(false);
+  const notificationTimerRef = useRef<number | null>(null);
   const activeChat = useMemo(() => chatThreads.find((thread) => thread.id === activeChatId) || chatThreads[0], [chatThreads, activeChatId]);
   const activeMessages = activeChat?.messages || [];
   const lang = resolveLanguage(settings.language);
@@ -754,6 +757,17 @@ export default function App() {
     if (!isBadMemberTokenError(result)) return false;
     await logoutMember(tr('登录状态已失效，请重新登录。', 'Your session expired. Please sign in again.'));
     return true;
+  });
+  const showNotification = useEffectEvent((kind: AppNotification['kind'], message: string) => {
+    if (notificationTimerRef.current) {
+      window.clearTimeout(notificationTimerRef.current);
+    }
+
+    setNotification(createAppNotification(kind, message));
+    notificationTimerRef.current = window.setTimeout(() => {
+      setNotification(null);
+      notificationTimerRef.current = null;
+    }, 4200);
   });
 
   const getSearchReasonLabel = (reason: SearchReason) => {
@@ -894,12 +908,12 @@ export default function App() {
       setIsUnlocked(true);
       setUnlockError('');
     }
-    alert(tr('设置已保存', 'Settings saved.'));
+    showNotification('success', tr('设置已保存', 'Settings saved.'));
   };
 
   const handleTestLlmSettings = () => {
     if (llmModeView.effectiveMode === 'byok' && !settings.apiKey.trim()) {
-      alert(tr('请先填写 API Key。', 'Please enter an API Key first.'));
+      showNotification('error', tr('请先填写 API Key。', 'Please enter an API Key first.'));
       return;
     }
 
@@ -920,16 +934,16 @@ export default function App() {
         setIsTestingLlm(false);
 
         if (chrome.runtime.lastError) {
-          alert(tr('测试失败，后台服务暂时不可用。', 'Test failed. Background service is unavailable.'));
+          showNotification('error', tr('测试失败，后台服务暂时不可用。', 'Test failed. Background service is unavailable.'));
           return;
         }
 
         if (res?.status === 'ok') {
-          alert(res.message || tr('LLM 配置测试成功。', 'LLM configuration test succeeded.'));
+          showNotification('success', res.message || tr('LLM 配置测试成功。', 'LLM configuration test succeeded.'));
           return;
         }
 
-        alert(res?.message || tr('LLM 配置测试失败，请检查接口地址、模型名和 API Key。', 'LLM configuration test failed. Check endpoint, model, and API key.'));
+        showNotification('error', res?.message || tr('LLM 配置测试失败，请检查接口地址、模型名和 API Key。', 'LLM configuration test failed. Check endpoint, model, and API key.'));
       }
     );
   };
@@ -938,6 +952,14 @@ export default function App() {
     if (settings.aiMode === llmModeView.effectiveMode) return;
     setSettings((prev) => ({ ...prev, aiMode: llmModeView.effectiveMode }));
   }, [settings.aiMode, llmModeView.effectiveMode]);
+
+  useEffect(() => {
+    return () => {
+      if (notificationTimerRef.current) {
+        window.clearTimeout(notificationTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleUnlock = () => {
     if (!settings.accessPassword) {
@@ -2980,6 +3002,28 @@ export default function App() {
           )}
         </div>
       </div>
+      {notification ? (
+        <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+          <div
+            className={[
+              'pointer-events-auto flex max-w-xl items-start gap-3 rounded-2xl border px-4 py-3 shadow-lg backdrop-blur',
+              notification.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-950' : '',
+              notification.kind === 'error' ? 'border-rose-200 bg-rose-50 text-rose-950' : '',
+              notification.kind === 'info' ? 'border-zinc-200 bg-white text-zinc-900' : '',
+            ].join(' ')}
+          >
+            <div className="min-w-0 flex-1 text-sm leading-6">{notification.message}</div>
+            <button
+              type="button"
+              onClick={() => setNotification(null)}
+              className="rounded-full p-1 text-current/60 transition-colors hover:bg-black/5 hover:text-current"
+              aria-label={tr('关闭通知', 'Dismiss notification')}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

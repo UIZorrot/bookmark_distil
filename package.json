@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run src/backendApi.test.ts",
+    "test": "vitest run src/backendApi.test.ts src/llmRequest.test.ts",
     "test:e2e": "npm run build && playwright test e2e"
   },
   "dependencies": {

@@ -1,8 +1,14 @@
 import { callHostedChatCompletion, extractTextContent, testHostedAiConnection } from '../backendApi';
+import {
+  buildLlmHeaders as buildLlmHeadersBase,
+  normalizeLlmEndpoint as normalizeLlmEndpointBase,
+} from '../llmRequest';
 
 export { };
 
 console.log('Background service worker running...');
+
+const SW_RUNTIME_MARKER = 'sw-20260525-1245';
 
 const APP_PAGE_URL = chrome.runtime.getURL('index.html');
 
@@ -229,7 +235,30 @@ function hasCompatibleChatChoice(data: unknown) {
   return Boolean((data as { choices?: unknown[] })?.choices?.length);
 }
 
+function extractErrorDetail(raw: string) {
+  const text = raw.trim();
+  if (!text) return '';
+
+  try {
+    const data = JSON.parse(text) as { error?: { message?: unknown }; detail?: unknown };
+    const detail = typeof data.detail === 'string' ? data.detail.trim() : '';
+    if (detail) return detail;
+    const message = typeof data.error?.message === 'string' ? data.error.message.trim() : '';
+    if (message) return message;
+  } catch {
+    // fall through
+  }
+
+  return text.slice(0, 240);
+}
+
 async function testLLMConnection(settings: Settings) {
+  console.log('[LLM test start]', SW_RUNTIME_MARKER, {
+    aiMode: settings.aiMode,
+    hasApiKey: Boolean(settings.apiKey?.trim()),
+    hasMemberToken: Boolean(settings.memberToken?.trim()),
+  });
+
   if (settings.aiMode === 'hosted') {
     if (!settings.memberToken?.trim()) {
       return { status: 'error' as const, message: '请先登录账号，或切回 BYOK 模式。' };
@@ -241,15 +270,15 @@ async function testLLMConnection(settings: Settings) {
       const provider = hosted.provider?.trim();
       const model = hosted.model?.trim();
       const suffix = provider || model ? `（${[provider, model].filter(Boolean).join(' / ')}）` : '';
-      return { status: 'ok' as const, message: `平台托管 AI 可用${suffix}。` };
+      return { status: 'ok' as const, message: `[${SW_RUNTIME_MARKER}] 平台托管 AI 可用${suffix}。` };
     }
 
-    return { status: 'error' as const, message: `平台托管 AI 不可用：${hosted.message}` };
+    return { status: 'error' as const, message: `[${SW_RUNTIME_MARKER}] 平台托管 AI 不可用：${hosted.message}` };
   }
 
   const apiKey = settings.apiKey?.trim();
   const model = settings.model?.trim() || 'gpt-3.5-turbo';
-  const normalizedEndpoint = normalizeLlmEndpoint(settings.endpoint);
+  const normalizedEndpoint = normalizeLlmEndpointBase(settings.endpoint);
 
   if (!apiKey) {
     return { status: 'error' as const, message: '请先填写 API Key。' };
@@ -264,7 +293,7 @@ async function testLLMConnection(settings: Settings) {
   try {
     const response = await fetchWithTimeout(endpoint, {
       method: 'POST',
-      headers: buildLlmHeaders(endpoint, apiKey),
+      headers: buildLlmHeadersBase(endpoint, apiKey),
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: 'Reply with a short plain text: OK' }],
@@ -277,9 +306,12 @@ async function testLLMConnection(settings: Settings) {
     const contentType = response.headers.get('content-type') || '';
 
     if (!response.ok) {
+      const detail = extractErrorDetail(raw);
       return {
         status: 'error' as const,
-        message: `接口返回错误：${response.status} ${response.statusText || ''}`.trim(),
+        message: detail
+          ? `接口返回错误：${response.status} ${response.statusText || ''} - ${detail}`.trim()
+          : `接口返回错误：${response.status} ${response.statusText || ''}`.trim(),
       };
     }
 
@@ -308,13 +340,13 @@ async function testLLMConnection(settings: Settings) {
     if (content || reasoning || hasCompatibleChatChoice(data)) {
       return {
         status: 'ok' as const,
-        message: `测试成功：已收到模型响应（${model}）。`,
+        message: `[${SW_RUNTIME_MARKER}] 测试成功：已收到模型响应（${model}）。`,
       };
     }
 
     return {
       status: 'error' as const,
-      message: '接口已响应，但返回结构不是兼容的 chat/completions 格式。',
+      message: `[${SW_RUNTIME_MARKER}] 接口已响应，但返回结构不是兼容的 chat/completions 格式。`,
     };
   } catch (error) {
     console.error('LLM test error:', error);
@@ -329,8 +361,8 @@ async function testLLMConnection(settings: Settings) {
       status: 'error' as const,
       message:
         endpointHost === 'openrouter.ai'
-          ? '请求没有成功发到 OpenRouter。请确认 endpoint 为 `https://openrouter.ai/api/v1/chat/completions`，然后刷新扩展后重试。'
-          : '请求失败，请检查 endpoint、网络、扩展权限和 API Key。',
+          ? `[${SW_RUNTIME_MARKER}] 请求没有成功发到 OpenRouter。请确认 endpoint 为 https://openrouter.ai/api/v1/chat/completions，然后刷新扩展后重试。`
+          : `[${SW_RUNTIME_MARKER}] 请求失败，请检查 endpoint、网络、扩展权限和 API Key。`,
     };
   }
 }
