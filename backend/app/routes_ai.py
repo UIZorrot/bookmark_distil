@@ -24,6 +24,11 @@ router = APIRouter(prefix="/member", tags=["member-ai"])
 _LOG = logging.getLogger("bookmark_distil.member_ai")
 
 
+def _has_relay_choices(response_json: dict[str, Any]) -> bool:
+    choices = response_json.get("choices")
+    return isinstance(choices, list) and len(choices) > 0
+
+
 @router.get("/me")
 async def member_profile(user: CurrentUserDep) -> dict[str, Any]:
     return {
@@ -34,6 +39,41 @@ async def member_profile(user: CurrentUserDep) -> dict[str, Any]:
         if user.subscription_current_period_end
         else None,
         "hosted_ai_enabled": subscription_has_managed_ai(user),
+    }
+
+
+@router.post("/ai/test")
+async def hosted_ai_test(
+    request: Request,
+    user: CurrentUserDep,
+) -> dict[str, Any]:
+    settings = request.app.state.settings
+
+    if not subscription_has_managed_ai(user):
+        raise HTTPException(status_code=402, detail="subscription_required")
+
+    try:
+        response_json, meta = await relay_chat_completion(
+            settings=settings,
+            force_openrouter_free=bool(not settings.deepseek_api_key.strip()),
+            payload={
+                "messages": [{"role": "user", "content": "Reply with a short plain text: OK"}],
+                "temperature": 0,
+                "max_tokens": 16,
+            },
+        )
+    except RuntimeError as exc:
+        _LOG.warning("upstream_llm_test_failure user=%s err=%s", user.id, exc)
+        raise HTTPException(status_code=503, detail="upstream_llm_unavailable") from exc
+
+    if not _has_relay_choices(response_json):
+        _LOG.warning("upstream_llm_test_invalid_response user=%s meta=%s", user.id, meta)
+        raise HTTPException(status_code=503, detail="upstream_llm_invalid_response")
+
+    return {
+        "ok": True,
+        "provider": str(meta.get("provider", "")),
+        "model": str(meta.get("model", "")),
     }
 
 

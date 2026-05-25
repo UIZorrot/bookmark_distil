@@ -1,4 +1,4 @@
-import { callHostedChatCompletion } from '../backendApi';
+import { callHostedChatCompletion, testHostedAiConnection } from '../backendApi';
 
 export { };
 
@@ -231,17 +231,13 @@ async function testLLMConnection(settings: Settings) {
       return { status: 'error' as const, message: '请先登录账号，或切回 BYOK 模式。' };
     }
 
-    const hosted = await callHostedChatCompletion(
-      { token: settings.memberToken },
-      {
-        messages: [{ role: 'user', content: 'Reply with a short plain text: OK' }],
-        temperature: 0,
-        max_tokens: 16,
-      },
-    );
+    const hosted = await testHostedAiConnection({ token: settings.memberToken });
 
     if (hosted.status === 'ok') {
-      return { status: 'ok' as const, message: '平台托管 AI 可用。' };
+      const provider = hosted.provider?.trim();
+      const model = hosted.model?.trim();
+      const suffix = provider || model ? `（${[provider, model].filter(Boolean).join(' / ')}）` : '';
+      return { status: 'ok' as const, message: `平台托管 AI 可用${suffix}。` };
     }
 
     return { status: 'error' as const, message: `平台托管 AI 不可用：${hosted.message}` };

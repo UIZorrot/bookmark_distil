@@ -41,6 +41,14 @@ export type HostedChatResult =
   | { status: 'ok'; answer: string }
   | { status: 'error'; message: string; statusCode?: number };
 
+export type HostedAiTestResult =
+  | { status: 'ok'; provider?: string; model?: string }
+  | { status: 'error'; message: string; statusCode?: number };
+
+export function isBadMemberTokenError(result: { status?: string; message?: string; statusCode?: number } | null | undefined) {
+  return result?.status === 'error' && result.statusCode === 401 && result.message === 'bad_token';
+}
+
 export function normalizeMemberApiBase(apiBase?: string) {
   const raw = apiBase?.trim() || DEFAULT_MEMBER_API_BASE;
   return raw.replace(/\/+$/, '');
@@ -55,6 +63,35 @@ function networkError() {
     status: 'error' as const,
     message: 'Network request failed. Check whether the local backend is running and reachable.',
   };
+}
+
+function extractTextContent(value: unknown): string | null {
+  if (typeof value === 'string') {
+    return value.trim() ? value : null;
+  }
+
+  if (Array.isArray(value)) {
+    const combined = value
+      .map((item) => extractTextContent(item))
+      .filter((item): item is string => Boolean(item))
+      .join('');
+    const trimmed = combined.trim();
+    return trimmed || null;
+  }
+
+  if (!value || typeof value !== 'object') return null;
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.text === 'string' && record.text.trim()) {
+    return record.text;
+  }
+
+  if ('content' in record) {
+    return extractTextContent(record.content);
+  }
+
+  return null;
 }
 
 async function readError(response: Response) {
@@ -252,14 +289,51 @@ export async function callHostedChatCompletion(
     }
 
     const data = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
-    const content = data.choices?.[0]?.message?.content;
-    if (typeof content === 'string' && content.trim()) {
+    const content = extractTextContent(data.choices?.[0]?.message?.content);
+    if (content) {
       return { status: 'ok', answer: content };
     }
 
     return { status: 'error', message: 'Hosted AI returned no answer.' };
   } catch (error) {
     console.error('Hosted AI request failed:', error);
+    return { status: 'error', message: 'Hosted AI is unavailable. BYOK and local features still work.' };
+  }
+}
+
+export async function testHostedAiConnection(
+  auth: MemberApiAuth,
+  fetcher: Fetcher = fetch,
+): Promise<HostedAiTestResult> {
+  const token = auth.token?.trim();
+  if (!token) return { status: 'error', message: 'Missing member token.' };
+
+  try {
+    const response = await fetcher(endpoint(auth.apiBase, '/member/ai/test'), {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return { status: 'error', message: await readError(response), statusCode: response.status };
+    }
+
+    const data = await response.json() as { ok?: unknown; provider?: unknown; model?: unknown };
+    if (data.ok === true) {
+      return {
+        status: 'ok',
+        provider: typeof data.provider === 'string' ? data.provider : undefined,
+        model: typeof data.model === 'string' ? data.model : undefined,
+      };
+    }
+
+    return { status: 'error', message: 'Hosted AI test returned an invalid response.' };
+  } catch (error) {
+    console.error('Hosted AI test request failed:', error);
     return { status: 'error', message: 'Hosted AI is unavailable. BYOK and local features still work.' };
   }
 }

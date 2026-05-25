@@ -6,8 +6,10 @@ import {
   createCheckoutSession,
   downloadSyncState,
   getMemberProfile,
+  isBadMemberTokenError,
   redeemInviteCode,
   requestEmailVerificationCode,
+  testHostedAiConnection,
   uploadSyncState,
   verifyEmailVerificationCode,
 } from './backendApi';
@@ -46,6 +48,66 @@ describe('backend API client', () => {
       }),
     });
     expect(res).toEqual({ status: 'ok', answer: 'hosted answer' });
+  });
+
+  it('accepts hosted AI responses whose content is returned as text parts', async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: [
+                { type: 'text', text: 'hosted ' },
+                { type: 'text', text: 'answer' },
+              ],
+            },
+          },
+        ],
+      }),
+    });
+
+    const res = await callHostedChatCompletion(
+      {
+        apiBase: 'https://tool.bookmark.txzy.net/api/v1',
+        token: 'member-token',
+      },
+      {
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+      fetcher,
+    );
+
+    expect(res).toEqual({ status: 'ok', answer: 'hosted answer' });
+  });
+
+  it('tests hosted AI through the dedicated backend health endpoint', async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        provider: 'deepseek',
+        model: 'deepseek-chat',
+      }),
+    });
+
+    const res = await testHostedAiConnection(
+      {
+        apiBase: 'https://tool.bookmark.txzy.net/api/v1',
+        token: 'member-token',
+      },
+      fetcher,
+    );
+
+    expect(fetcher).toHaveBeenCalledWith('https://tool.bookmark.txzy.net/api/v1/member/ai/test', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer member-token',
+        'Content-Type': 'application/json',
+      },
+    });
+    expect(res).toEqual({ status: 'ok', provider: 'deepseek', model: 'deepseek-chat' });
   });
 
   it('normalizes API base for auth and billing endpoints', async () => {
@@ -156,5 +218,12 @@ describe('backend API client', () => {
       'http://127.0.0.1:8789/api/v1/sync/state',
       'http://127.0.0.1:8789/api/v1/sync/state',
     ]);
+  });
+
+  it('detects invalid member tokens from API responses', () => {
+    expect(isBadMemberTokenError({ status: 'error', message: 'bad_token', statusCode: 401 })).toBe(true);
+    expect(isBadMemberTokenError({ status: 'error', message: 'user_not_found', statusCode: 401 })).toBe(false);
+    expect(isBadMemberTokenError({ status: 'error', message: 'bad_token', statusCode: 400 })).toBe(false);
+    expect(isBadMemberTokenError({ status: 'ok' })).toBe(false);
   });
 });
