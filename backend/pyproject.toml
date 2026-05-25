@@ -1,0 +1,20 @@
+[project]
+name = "bookmark-distil-backend"
+version = "0.1.0"
+description = "FastAPI backend for Bookmark Distil membership, billing, and hosted AI."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.6",
+  "uvicorn[standard]>=0.32.1",
+  "sqlalchemy[asyncio]>=2.0.36",
+  "asyncpg>=0.30.0",
+  "pydantic>=2.10.3",
+  "pydantic-settings>=2.6.1",
+  "email-validator>=2.2.0",
+  "python-jose[cryptography]>=3.3.0",
+  "httpx>=0.28.1",
+  "stripe>=11.4.2",
+]
+
+[tool.uv]
+package = false

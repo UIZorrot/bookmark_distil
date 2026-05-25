@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "backend:dev": "python -m uvicorn app.main:app --app-dir backend --reload --host 0.0.0.0 --port 8789",
-    "backend:check": "python -m compileall backend/app -q && python -c \"import sys; sys.path.insert(0, 'backend'); from app.main import app; print(app.title)\"",
+    "backend:sync": "cd backend && uv sync",
+    "backend:dev": "cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8789",
+    "backend:check": "cd backend && uv run python -m compileall app -q && uv run python -c \"from app.main import app; print(app.title)\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",

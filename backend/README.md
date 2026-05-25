@@ -11,10 +11,10 @@ Python service for **`tool.bookmark.txzy.net`**: Postgres metadata, email verifi
 
 ```bash
 cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1          # PowerShell Windows
-pip install -r requirements.txt
+uv sync
 ```
+
+If you prefer to keep using a manual virtualenv, `requirements.txt` is still available as a fallback, but `uv sync` is now the primary path.
 
 ### Configuration (`backend/.env` or repo root `.env`)
 
@@ -44,7 +44,7 @@ Copy `backend/.env.example` → `backend/.env` and populate **all** placeholders
 
 ```bash
 cd backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8789
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8789
 ```
 
 - Health: `GET http://127.0.0.1:8789/health`  

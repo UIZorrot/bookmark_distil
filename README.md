@@ -26,6 +26,14 @@ Use the `@crxjs/vite-plugin` dev flow as documented in the [crxjs Vite Plugin gu
 For local member/backend integration, run the API separately:
 
 ```bash
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8789
+```
+
+Or from the repo root:
+
+```bash
 npm run backend:dev
 ```
 
